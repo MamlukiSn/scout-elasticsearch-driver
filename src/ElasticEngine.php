@@ -12,6 +12,12 @@ use ScoutElastic\Builders\SearchBuilder;
 use ScoutElastic\Facades\ElasticClient;
 use ScoutElastic\Indexers\IndexerInterface;
 use ScoutElastic\Payloads\TypePayload;
+use ScoutElastic\Factories\ModelFactoryInterface;
+use InvalidArgumentException;
+use Elastic\Adapter\Indices\Index;
+use Elastic\Adapter\Indices\IndexManager;
+use Elastic\Adapter\Search\SearchResult;
+use Illuminate\Support\LazyCollection;
 use stdClass;
 
 class ElasticEngine extends Engine
@@ -22,6 +28,9 @@ class ElasticEngine extends Engine
      * @var \ScoutElastic\Indexers\IndexerInterface
      */
     protected $indexer;
+
+    protected ModelFactoryInterface $modelFactory;
+    protected IndexManager $indexManager;
 
     /**
      * Should the mapping be updated.
@@ -361,5 +370,40 @@ class ElasticEngine extends Engine
         $query
             ->orderBy($model->getScoutKeyName())
             ->unsearchable();
+    }
+
+    /**
+     * @param SearchResult $results
+     * @param Model        $model
+     *
+     * @return LazyCollection
+     */
+    public function lazyMap(Builder $builder, $results, $model): LazyCollection
+    {
+        return $this->modelFactory->makeLazyFromSearchResult($results, $builder);
+    }
+
+    /**
+     * @param string $name
+     *
+     * @return void
+     */
+    public function createIndex($name, array $options = [])
+    {
+        if (isset($options['primaryKey'])) {
+            throw new InvalidArgumentException('It is not possible to change the primary key name');
+        }
+
+        $this->indexManager->create(new Index($name));
+    }
+
+    /**
+     * @param string $name
+     *
+     * @return void
+     */
+    public function deleteIndex($name)
+    {
+        $this->indexManager->drop($name);
     }
 }
